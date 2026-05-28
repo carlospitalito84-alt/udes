@@ -1,0 +1,195 @@
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Cosecha Campesina: Android</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { touch-action: manipulation; }
+        .touch-btn { transition: transform 0.1s ease; }
+        .touch-btn:active { transform: scale(0.95); }
+        input, button { font-size: 16px !important; } /* Prevents iOS/Android auto-zoom on input */
+    </style>
+</head>
+<body class="bg-green-50 p-4 min-h-screen">
+    <div id="game-container" class="max-w-md mx-auto bg-white p-6 rounded-3xl shadow-xl min-h-[90vh]">
+        <h1 class="text-2xl font-black text-green-800 mb-6 text-center">Cosecha Campesina ??</h1>
+        
+        <!-- Registration Section -->
+        <div id="registration" class="space-y-4">
+            <input id="p-name" type="text" placeholder="Tu nombre" class="w-full p-4 border-2 border-green-200 rounded-2xl focus:border-green-500 outline-none">
+            <input id="p-grade" type="text" placeholder="Tu grado (ej. 4B)" class="w-full p-4 border-2 border-green-200 rounded-2xl focus:border-green-500 outline-none">
+            <button onclick="registerParticipant()" class="w-full bg-green-600 text-white py-4 rounded-2xl font-bold hover:bg-green-700 transition touch-btn">Entrar a la Finca</button>
+            <button onclick="toggleHistory()" class="w-full mt-2 bg-gray-100 text-gray-600 py-2 rounded-xl text-sm font-bold touch-btn">Ver Historial de Granjeros</button>
+        </div>
+
+        <!-- Section for History -->
+        <div id="history-section" class="hidden mt-6 bg-gray-50 p-4 rounded-2xl border border-gray-200">
+            <h3 class="font-bold text-gray-700 mb-2 text-sm">Historial de visitantes:</h3>
+            <div id="participants-list" class="space-y-2 max-h-40 overflow-y-auto pr-2"></div>
+        </div>
+
+        <!-- Mission Selection -->
+        <div id="mission-selection" class="hidden space-y-4">
+            <h2 class="text-lg font-bold text-center text-green-800">Elige tu aventura:</h2>
+            <button onclick="startMission('maizal')" class="w-full bg-emerald-100 text-emerald-800 p-5 rounded-2xl border-2 border-emerald-300 hover:bg-emerald-200 transition font-bold text-lg touch-btn">?? Misión Maizal</button>
+            <button onclick="startMission('cabalgata')" class="w-full bg-amber-100 text-amber-800 p-5 rounded-2xl border-2 border-amber-300 hover:bg-amber-200 transition font-bold text-lg touch-btn">?? Misión Cabalgata</button>
+        </div>
+
+        <!-- Mission Area -->
+        <div id="mission-area" class="hidden">
+            <div id="scoreboard" class="flex justify-between p-3 bg-yellow-100 rounded-2xl mb-4 text-yellow-900 font-bold border border-yellow-200">
+                <div>Nivel: <span id="s-level">1</span></div>
+                <div>Aciertos: <span id="s-hits">0</span>/10</div>
+            </div>
+
+            <button onclick="showMenu()" class="mb-4 text-sm bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-bold touch-btn">? Volver</button>
+            
+            <div id="mission-header" class="mb-4 text-lg font-bold text-green-900 leading-tight"></div>
+
+            <div id="horse-path-container" class="hidden mb-6">
+                <div class="relative w-full h-16 bg-amber-200 rounded-full flex items-center border-4 border-amber-300 overflow-hidden">
+                    <div id="horse-icon" class="text-3xl absolute transition-all duration-500" style="left: 0%;">??</div>
+                    <div class="absolute right-2 text-3xl">???</div>
+                </div>
+            </div>
+
+            <div id="game-grid" class="flex flex-wrap justify-center gap-1 mb-6 p-3 bg-green-100 rounded-2xl"></div>
+            
+            <div id="math-activity" class="hidden p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+                <h3 id="question-text" class="font-bold text-emerald-800 mb-3">¿Qué operación es?</h3>
+                <div id="options-container" class="grid grid-cols-2 gap-2"></div>
+                <div id="result-box" class="mt-3 h-8 font-black text-emerald-900 text-center"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let participant = { name: '', grade: '' };
+        let activeMission = '';
+        let hits = 0;
+        let level = 1;
+        let currentRows = 4, currentCols = 5;
+
+        function registerParticipant() {
+            const name = document.getElementById('p-name').value;
+            const grade = document.getElementById('p-grade').value;
+            if(!name || !grade) return alert("Por favor, rellena tus datos.");
+            
+            // Save to LocalStorage History
+            let history = JSON.parse(localStorage.getItem('farm_history') || '[]');
+            history.push({ name, grade, date: new Date().toLocaleTimeString() });
+            localStorage.setItem('farm_history', JSON.stringify(history));
+
+            participant = { name, grade };
+            document.getElementById('registration').classList.add('hidden');
+            document.getElementById('mission-selection').classList.remove('hidden');
+        }
+
+        function toggleHistory() {
+            const sec = document.getElementById('history-section');
+            const list = document.getElementById('participants-list');
+            sec.classList.toggle('hidden');
+            
+            if(!sec.classList.contains('hidden')) {
+                let history = JSON.parse(localStorage.getItem('farm_history') || '[]');
+                list.innerHTML = history.length > 0 
+                    ? history.map(p => `<div class="bg-white p-2 rounded-lg text-sm border flex justify-between"><span><b>${p.name}</b> (${p.grade})</span><span class="text-xs text-gray-400">${p.date}</span></div>`).join('')
+                    : '<p class="text-xs text-gray-400 text-center">Aún no hay granjeros registrados.</p>';
+            }
+        }
+
+        function showMenu() {
+            document.getElementById('mission-selection').classList.remove('hidden');
+            document.getElementById('mission-area').classList.add('hidden');
+        }
+
+        function startMission(type) {
+            activeMission = type;
+            hits = 0;
+            document.getElementById('mission-selection').classList.add('hidden');
+            document.getElementById('mission-area').classList.remove('hidden');
+            document.getElementById('horse-path-container').classList.toggle('hidden', type !== 'cabalgata');
+            updateScoreboard();
+            generateChallenge();
+        }
+
+        function generateChallenge() {
+            const range = 4 + level; 
+            currentRows = Math.floor(Math.random() * range) + 2;
+            currentCols = Math.floor(Math.random() * range) + 2;
+            
+            const product = currentRows * currentCols;
+            document.getElementById('mission-header').innerText = activeMission === 'maizal' ? `Cosecha ${currentRows} × ${currentCols}` : `¿Resultado de ${currentRows} × ${currentCols}?`;
+            
+            const grid = document.getElementById('game-grid');
+            grid.innerHTML = '';
+            
+            if (activeMission === 'maizal') {
+                for(let i = 0; i < currentRows * currentCols; i++) {
+                    const plant = document.createElement('div');
+                    plant.className = "w-8 h-8 flex items-center justify-center text-xl";
+                    plant.innerText = "??";
+                    grid.appendChild(plant);
+                }
+            } else {
+                grid.innerHTML = `<div class="text-5xl py-2">??</div>`;
+            }
+            
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+            let options = [`${currentRows * currentCols}`];
+            while(options.length < 4) {
+                let r = Math.floor(Math.random() * 8) + 2;
+                let c = Math.floor(Math.random() * 8) + 2;
+                let res = (r * c).toString();
+                if(!options.includes(res)) options.push(res);
+            }
+            options.sort(() => Math.random() - 0.5);
+            
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "bg-white border-2 border-emerald-300 text-emerald-800 font-bold py-4 rounded-xl hover:bg-emerald-100 transition touch-btn";
+                btn.innerText = opt;
+                btn.onclick = () => checkMath(opt);
+                optionsContainer.appendChild(btn);
+            });
+            
+            document.getElementById('math-activity').classList.remove('hidden');
+            document.getElementById('result-box').innerText = "";
+        }
+
+        function checkMath(selectedVal) {
+            const correctVal = (currentRows * currentCols).toString();
+            const resBox = document.getElementById('result-box');
+            
+            if(selectedVal === correctVal) {
+                hits++;
+                updateScoreboard();
+                
+                if(activeMission === 'cabalgata') {
+                    const horse = document.getElementById('horse-icon');
+                    horse.style.left = Math.min((hits * 8.5), 85) + "%";
+                }
+
+                if(hits >= 10) {
+                    alert("¡Misión Completada, granjero!");
+                    showMenu();
+                } else {
+                    resBox.innerHTML = `<span class="text-green-600 font-bold">¡Correcto!</span>`;
+                    setTimeout(generateChallenge, 800);
+                }
+            } else {
+                resBox.innerHTML = `<span class="text-red-600 font-bold">¡Inténtalo otra vez!</span>`;
+            }
+        }
+
+        function updateScoreboard() {
+            document.getElementById('s-level').innerText = level;
+            document.getElementById('s-hits').innerText = hits;
+        }
+    </script>
+</body>
+</html>
